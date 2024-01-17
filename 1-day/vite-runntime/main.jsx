@@ -10,15 +10,7 @@
 // textEl.nodeValue = 'app'
 // app.append(textEl);
 
-
-
-
-
 // --------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
 
 // v2 react 通过vdom的形式去描述对象（js object）
 
@@ -101,8 +93,8 @@
 // 	container.append(dom);
 // }
 
-import React from './core/React.js'
-import App from './App.jsx'
-import ReactDom from './core/ReactDom.js'
+import React from "./core/React.js";
+import App from "./App.jsx";
+import ReactDom from "./core/ReactDom.js";
 
-ReactDom.createRoot(document.getElementById('root')).render(App);
+ReactDom.createRoot(document.getElementById("root")).render(<App />);

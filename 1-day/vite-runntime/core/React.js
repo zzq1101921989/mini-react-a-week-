@@ -1,4 +1,11 @@
-import { HOST_ROOT, getTag, toArray, createStateNode } from "../util";
+import {
+	HOST_ROOT,
+    HOST_COMPONENT,
+	getTag,
+	toArray,
+	createStateNode,
+	isFunctionComponent,
+} from "../util";
 
 // 当前任务
 let subTask = null;
@@ -65,6 +72,7 @@ function reconciler(parentFiber, childFiber) {
 		const newFiber = {
 			props: childFiber.props,
 			type: childFiber.type,
+			effects: [],
 			tag: getTag(childFiber),
 			return: parentFiber,
 			child: null,
@@ -90,8 +98,13 @@ function reconciler(parentFiber, childFiber) {
  */
 function performWorkOfUnit(fiber) {
 	if (fiber.props.children) {
-		reconciler(fiber, fiber.props.children);
+		if (isFunctionComponent(fiber.type)) {
+			reconciler(fiber, fiber.stateNode());
+		} else {
+			reconciler(fiber, fiber.props.children);
+		}
 	}
+
 	/* 如果有子fiber节点，那就继续向下构建咯（深度优先遍历 --- 递归） */
 	if (fiber.child) {
 		return fiber.child;
@@ -102,6 +115,11 @@ function performWorkOfUnit(fiber) {
 
 	// 如果有父级节点，证明就还没有完全构建完成
 	while (currentHanlderFiber.return) {
+		currentHanlderFiber.return.effects =
+			currentHanlderFiber.return.effects.concat(
+				currentHanlderFiber.effects.concat(currentHanlderFiber)
+			);
+
 		if (currentHanlderFiber.sibling) {
 			return currentHanlderFiber.sibling;
 		}
@@ -110,10 +128,27 @@ function performWorkOfUnit(fiber) {
 
 	// 到了这一步，那就证明fiber全部构建完毕
 	paddingCommit = currentHanlderFiber;
-	console.log(paddingCommit, "paddingCommit");
 
 	return null;
+}
 
+function commitRoot(fiber) {
+
+	fiber.effects.forEach((child) => {
+        
+		// 父级fiber
+		let parentFiber = child.return;
+
+		// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
+		while (isFunctionComponent(parentFiber.type)) {
+            parentFiber = parentFiber.return
+		}
+
+        if (child.tag === HOST_COMPONENT) {
+            parentFiber.stateNode.append(child.stateNode);
+        }
+
+	});
 }
 
 /**
@@ -129,9 +164,11 @@ function workLoop(deadlineTime) {
 
 		// 准备开始构建真实dom节点了哦
 		if (paddingCommit) {
-
+			commitRoot(paddingCommit);
 		}
 	}
+	// 递归的去执行构建任务 workLoop
+	if (subTask) requestIdleCallback(workLoop);
 }
 
 /**
@@ -145,6 +182,8 @@ function render(startFible, container) {
 		props: { children: startFible },
 		stateNode: container,
 		tag: HOST_ROOT,
+		// 保存所有子孙的fiber对象
+		effects: [],
 		child: null,
 	};
 
