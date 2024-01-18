@@ -3,38 +3,44 @@ export const HOST_COMPONENT = "hoot_component";
 export const FUNCTION_COMPONENT = "function_component";
 export const CLASS_COMPONENT = "class_component";
 
-
-
 /**
  * 渲染style props
- * @param {*} el 
- * @param {*} styleMap 
+ * @param {*} el
+ * @param {*} styleMap
  */
 function handlerElementStyle(el, styleMap) {
-    Object.keys(styleMap).forEach(sty => {
-        el.style[sty] = styleMap[sty]
-    })
+	Object.keys(styleMap).forEach((sty) => {
+		el.style[sty] = styleMap[sty];
+	});
 }
 
 /**
- *
- * @param {*} el
+ * 绑定props属性
+ * @param {HTMLElement} el
  * @param {*} newProps
  */
 function updateDomElementProps(el, newProps) {
 	Object.keys(newProps).forEach((p) => {
 		if (p !== "children") {
-            if (p === 'style') {
-                handlerElementStyle(el, newProps[p])
-            } else {
-                el.setAttribute(p, newProps[p]);
-            }
+            // 绑定事件
+			if (p.slice(0, 2) === "on") {
+				const eventType = p.slice(2).toLocaleLowerCase();
+				el.addEventListener(eventType, newProps[p])
+			} 
+            // 绑定类型样式
+            else if (p === "style") {
+				handlerElementStyle(el, newProps[p]);
+			} 
+            // 绑定基本属性
+            else {
+				el.setAttribute(p, newProps[p]);
+			}
 		}
 	});
 }
 
 export function isFunctionComponent(type) {
-    return typeof type === 'function'
+	return typeof type === "function";
 }
 
 export const createDomElement = (fiber) => {
@@ -71,6 +77,6 @@ export const createStateNode = (fiber) => {
 
 		/* 处理函数组件的情况 */
 		case FUNCTION_COMPONENT:
-            return fiber.type
+			return fiber.type;
 	}
 };

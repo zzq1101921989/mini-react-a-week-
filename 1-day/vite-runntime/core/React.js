@@ -1,6 +1,6 @@
 import {
 	HOST_ROOT,
-    HOST_COMPONENT,
+	HOST_COMPONENT,
 	getTag,
 	toArray,
 	createStateNode,
@@ -10,8 +10,11 @@ import {
 // 当前任务
 let subTask = null;
 
-// 准备好的fiber，将要转换成真实的dom对象
+// 将要准备好的fiber，根据这个转换成真实的dom对象
 let paddingCommit = null;
+
+// 用于记录已经渲染好的fiber，用于双缓存对比使用
+let currentRoot = null;
 
 /**
  * 创建文本虚拟dom对象
@@ -39,7 +42,9 @@ function createElement(type, props, ...children) {
 		props: {
 			...props,
 			children: children.map((child) =>
-				typeof child === "string" ? createTextNodeVdom(child) : child
+				typeof child === "string" || typeof child === "number"
+					? createTextNodeVdom(child)
+					: child
 			),
 		},
 	};
@@ -97,6 +102,7 @@ function reconciler(parentFiber, childFiber) {
  * @param {*} fiber
  */
 function performWorkOfUnit(fiber) {
+
 	if (fiber.props.children) {
 		if (isFunctionComponent(fiber.type)) {
 			reconciler(fiber, fiber.stateNode());
@@ -129,25 +135,24 @@ function performWorkOfUnit(fiber) {
 	// 到了这一步，那就证明fiber全部构建完毕
 	paddingCommit = currentHanlderFiber;
 
+	currentRoot = currentHanlderFiber;
+
 	return null;
 }
 
 function commitRoot(fiber) {
-
 	fiber.effects.forEach((child) => {
-        
 		// 父级fiber
 		let parentFiber = child.return;
 
 		// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
 		while (isFunctionComponent(parentFiber.type)) {
-            parentFiber = parentFiber.return
+			parentFiber = parentFiber.return;
 		}
 
-        if (child.tag === HOST_COMPONENT) {
-            parentFiber.stateNode.append(child.stateNode);
-        }
-
+		if (child.tag === HOST_COMPONENT) {
+			parentFiber.stateNode.append(child.stateNode);
+		}
 	});
 }
 
@@ -190,6 +195,11 @@ function render(startFible, container) {
 	// 空余时间开始执行了！
 	requestIdleCallback(workLoop);
 }
+
+/**
+ * 更新逻辑
+ */
+function update() {}
 
 export default {
 	render,
