@@ -5,6 +5,7 @@ import {
 	toArray,
 	createStateNode,
 	isFunctionComponent,
+	updateDomElementProps,
 } from "../util";
 
 // 当前任务
@@ -12,9 +13,6 @@ let subTask = null;
 
 // 将要准备好的fiber，根据这个转换成真实的dom对象
 let paddingCommit = null;
-
-// 用于记录已经渲染好的fiber，用于双缓存对比使用
-let currentRoot = null;
 
 /**
  * 创建文本虚拟dom对象
@@ -67,23 +65,48 @@ function updateProps(dom, props) {
  * 构建父与子fiber的关系
  */
 function reconciler(parentFiber, childFiber) {
+	// 获取旧fiber树上的旧节点
+	let oldFiber = parentFiber.alternate?.child;
+
 	// 统一转换为数组，方便进行处理
 	const childFiberList = toArray(childFiber);
 
 	/* 记得上一个生成的fiber节点，方便构建兄弟关系 */
 	let preChildFiber = null;
 
-	childFiberList.forEach((childFiber, index) => {
-		const newFiber = {
-			props: childFiber.props,
-			type: childFiber.type,
-			effects: [],
-			tag: getTag(childFiber),
-			return: parentFiber,
-			child: null,
-			sibling: null,
-		};
-		newFiber.stateNode = createStateNode(newFiber);
+	childFiberList.forEach((child, index) => {
+		let newFiber = null;
+
+		const tag = getTag(child);
+
+		if (oldFiber && oldFiber.type === child.type) {
+			newFiber = {
+				props: child.props,
+				type: child.type,
+				effects: [],
+				tag,
+				return: parentFiber,
+				stateNode: oldFiber.stateNode,
+				alternate: oldFiber,
+				effectTag: "update",
+				child: null,
+				sibling: null,
+			};
+		} else {
+			newFiber = {
+				props: child.props,
+				type: child.type,
+				effects: [],
+				tag,
+				return: parentFiber,
+				effectTag: "placement",
+				child: null,
+				sibling: null,
+			};
+			newFiber.stateNode = createStateNode(newFiber);
+		}
+
+		if (oldFiber) oldFiber = oldFiber.sibling;
 
 		if (index === 0 && !parentFiber.child) {
 			parentFiber.child = newFiber;
@@ -102,7 +125,6 @@ function reconciler(parentFiber, childFiber) {
  * @param {*} fiber
  */
 function performWorkOfUnit(fiber) {
-
 	if (fiber.props.children) {
 		if (isFunctionComponent(fiber.type)) {
 			reconciler(fiber, fiber.stateNode());
@@ -135,23 +157,29 @@ function performWorkOfUnit(fiber) {
 	// 到了这一步，那就证明fiber全部构建完毕
 	paddingCommit = currentHanlderFiber;
 
-	currentRoot = currentHanlderFiber;
-
 	return null;
 }
 
 function commitRoot(fiber) {
 	fiber.effects.forEach((child) => {
-		// 父级fiber
-		let parentFiber = child.return;
+		if (child.effectTag === "placement") {
+			// 父级fiber
+			let parentFiber = child.return;
 
-		// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
-		while (isFunctionComponent(parentFiber.type)) {
-			parentFiber = parentFiber.return;
-		}
+			// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
+			while (isFunctionComponent(parentFiber.type)) {
+				parentFiber = parentFiber.return;
+			}
 
-		if (child.tag === HOST_COMPONENT) {
-			parentFiber.stateNode.append(child.stateNode);
+			if (child.tag === HOST_COMPONENT) {
+				parentFiber.stateNode.append(child.stateNode);
+			}
+		} else if (child.effectTag === "update") {
+			updateDomElementProps(
+				child.stateNode,
+				child.props,
+				child.alternate.props
+			);
 		}
 	});
 }
@@ -199,9 +227,21 @@ function render(startFible, container) {
 /**
  * 更新逻辑
  */
-function update() {}
+function update() {
+	subTask = {
+		props: paddingCommit.props,
+		stateNode: paddingCommit.stateNode,
+		alternate: paddingCommit,
+		tag: HOST_ROOT,
+		effects: [],
+		child: null,
+	};
+	// 空余时间开始执行了！
+	requestIdleCallback(workLoop);
+}
 
 export default {
 	render,
+	update,
 	createElement,
 };

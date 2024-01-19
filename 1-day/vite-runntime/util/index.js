@@ -19,12 +19,15 @@ function handlerElementStyle(el, styleMap) {
  * @param {HTMLElement} el
  * @param {*} newProps
  */
-function updateDomElementProps(el, newProps) {
+export function updateDomElementProps(el, newProps, oldProps) {
 	Object.keys(newProps).forEach((p) => {
 		if (p !== "children") {
             // 绑定事件
 			if (p.slice(0, 2) === "on") {
 				const eventType = p.slice(2).toLocaleLowerCase();
+
+                if (oldProps) el.removeEventListener(eventType, oldProps[p])
+
 				el.addEventListener(eventType, newProps[p])
 			} 
             // 绑定类型样式
@@ -33,7 +36,7 @@ function updateDomElementProps(el, newProps) {
 			} 
             // 绑定基本属性
             else {
-				el.setAttribute(p, newProps[p]);
+				el[p] = newProps[p];
 			}
 		}
 	});
