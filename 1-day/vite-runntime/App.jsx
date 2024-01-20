@@ -4,6 +4,7 @@ import React from "./core/React.js";
 // export default React.createElementVdom("div", { id: "app" }, "hi ", 'mini-react');
 
 let count = 10;
+let props = { id: 'button' }
 function NumberComponent() {
 	return <div id="numberContainer">这是一个函数组件</div>;
 }
@@ -12,6 +13,7 @@ const App = () => {
     
 	const handlerClick = () => {
         count++
+        props = {}
         React.update();
 	};
 
@@ -21,7 +23,7 @@ const App = () => {
 			style={{ color: "red" }}
 		>
 			<NumberComponent />
-			<div>
+			<div {...props}>
 				count: {count}
 				<button onClick={handlerClick}>点击</button>
 			</div>

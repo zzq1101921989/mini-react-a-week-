@@ -20,6 +20,18 @@ function handlerElementStyle(el, styleMap) {
  * @param {*} newProps
  */
 export function updateDomElementProps(el, newProps, oldProps) {
+
+    // 1.如果旧Props上面没有数据，那么就要清空掉
+    Object.keys(oldProps).forEach(props => {
+        if (props !== "children") {
+            if (!newProps[props] && el.nodeName !=='#text') {
+                el.removeAttribute(props)
+            }
+        }
+    })
+
+
+
 	Object.keys(newProps).forEach((p) => {
 		if (p !== "children") {
             // 绑定事件
@@ -51,7 +63,7 @@ export const createDomElement = (fiber) => {
 		return document.createTextNode(fiber.props.nodeValue);
 	} else {
 		const dom = document.createElement(fiber.type);
-		updateDomElementProps(dom, fiber.props);
+		updateDomElementProps(dom, fiber.props, {});
 		return dom;
 	}
 };
