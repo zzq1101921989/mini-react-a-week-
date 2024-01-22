@@ -33,9 +33,11 @@ const App = () => {
 				<button onClick={handlerClick}>点击</button>
 			</div>
 			hi - mini-react */}
-			{toggleFlag ? <NumberComponent/> : <b>我把函数组件隐藏了</b>}
+			{toggleFlag ? <NumberComponent /> : <b>我把函数组件隐藏了</b>}
 			{/* {toggleFlag ? <div id="numberContainer">这是一个函数组件</div> : <b>我把函数组件隐藏了</b>} */}
-			<button onClick={toggleDom}>{toggleFlag ? '隐藏函数组件' : '打开函数组件'}</button>
+			<button onClick={toggleDom}>
+				{toggleFlag ? "隐藏函数组件" : "打开函数组件"}
+			</button>
 		</div>
 	);
 };
