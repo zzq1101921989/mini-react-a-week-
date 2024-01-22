@@ -14,6 +14,9 @@ let subTask = null;
 // 将要准备好的fiber，根据这个转换成真实的dom对象
 let paddingCommit = null;
 
+// 将要进行删除的fiber数组
+let deleteFiberList = [];
+
 /**
  * 创建文本虚拟dom对象
  * @param { string } nodeValue
@@ -75,11 +78,13 @@ function reconciler(parentFiber, childFiber) {
 	let preChildFiber = null;
 
 	childFiberList.forEach((child, index) => {
+
 		let newFiber = null;
 
 		const tag = getTag(child);
 
-		if (oldFiber && oldFiber.type === child.type) {
+		// 类型一样，应该就是更新节点了
+		if (oldFiber && oldFiber.type === child.type && parentFiber.effectTag !== 'replace') {
 			newFiber = {
 				props: child.props,
 				type: child.type,
@@ -93,16 +98,20 @@ function reconciler(parentFiber, childFiber) {
 				sibling: null,
 			};
 		} else {
+			const isDeleteChild = oldFiber && oldFiber.type !== child.type;
+			if (isDeleteChild) deleteFiberList.push(oldFiber); 
 			newFiber = {
 				props: child.props,
 				type: child.type,
 				effects: [],
 				tag,
 				return: parentFiber,
-				effectTag: "placement",
+				alternate: isDeleteChild && parentFiber.effectTag !== 'replace' ? oldFiber : null,
+				effectTag: isDeleteChild && parentFiber.effectTag !== 'replace' ? 'replace' : "placement",
 				child: null,
 				sibling: null,
 			};
+
 			newFiber.stateNode = createStateNode(newFiber);
 		}
 
@@ -160,25 +169,60 @@ function performWorkOfUnit(fiber) {
 	return null;
 }
 
+/**
+ * 从记录将要进行删除fiber的数组中，移除掉不需要的fiber
+ * @param {*} fiber
+ */
+function commitDeleteFiber(fiber) {
+
+    let parentFiber = fiber.return
+
+    while(isFunctionComponent(parentFiber.type)) {
+        parentFiber = parentFiber.return
+    }
+
+    if (!isFunctionComponent(fiber.type)) {
+        parentFiber.stateNode.removeChild(fiber.stateNode);
+
+    }
+}
+
 function commitRoot(fiber) {
+
+	console.log(fiber.effects, "fiber.effects");
+
 	fiber.effects.forEach((child) => {
+		// 父级fiber
+		let parentFiber = child.return;
+
+		// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
+		while (isFunctionComponent(parentFiber.type)) {
+			parentFiber = parentFiber.return;
+		}
+
 		if (child.effectTag === "placement") {
-			// 父级fiber
-			let parentFiber = child.return;
-
-			// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
-			while (isFunctionComponent(parentFiber.type)) {
-				parentFiber = parentFiber.return;
-			}
-
 			if (child.tag === HOST_COMPONENT) {
 				parentFiber.stateNode.append(child.stateNode);
 			}
-		} else if (child.effectTag === "update") {
+		} 
+        else if (child.effectTag === "update") {
 			updateDomElementProps(
 				child.stateNode,
 				child.props,
 				child.alternate.props
+			);
+		}
+		else if (child.effectTag === "replace") {
+
+            let insertBeforeChild = child
+
+            while (isFunctionComponent(insertBeforeChild.type)) {
+                insertBeforeChild = insertBeforeChild.child
+            }
+
+			parentFiber.stateNode.insertBefore(
+				insertBeforeChild.stateNode,
+				child.sibling.stateNode
 			);
 		}
 	});
@@ -197,7 +241,12 @@ function workLoop(deadlineTime) {
 
 		// 准备开始构建真实dom节点了哦
 		if (paddingCommit) {
+			if (deleteFiberList.length)
+				deleteFiberList.forEach(commitDeleteFiber);
+
 			commitRoot(paddingCommit);
+
+			deleteFiberList = [];
 		}
 	}
 	// 递归的去执行构建任务 workLoop
@@ -236,6 +285,7 @@ function update() {
 		effects: [],
 		child: null,
 	};
+
 	// 空余时间开始执行了！
 	requestIdleCallback(workLoop);
 }

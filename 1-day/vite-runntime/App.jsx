@@ -4,17 +4,22 @@ import React from "./core/React.js";
 // export default React.createElementVdom("div", { id: "app" }, "hi ", 'mini-react');
 
 let count = 10;
-let props = { id: 'button' }
+let props = { id: "button" };
+let toggleFlag = true;
 function NumberComponent() {
 	return <div id="numberContainer">这是一个函数组件</div>;
 }
 
 const App = () => {
-    
 	const handlerClick = () => {
-        count++
-        props = {}
-        React.update();
+		count++;
+		props = {};
+		React.update();
+	};
+
+	const toggleDom = () => {
+		toggleFlag = !toggleFlag;
+		React.update();
 	};
 
 	return (
@@ -22,12 +27,15 @@ const App = () => {
 			id="container"
 			style={{ color: "red" }}
 		>
-			<NumberComponent />
+			{/* <NumberComponent />
 			<div {...props}>
 				count: {count}
 				<button onClick={handlerClick}>点击</button>
 			</div>
-			hi - mini-react
+			hi - mini-react */}
+			{toggleFlag ? <NumberComponent/> : <b>我把函数组件隐藏了</b>}
+			{/* {toggleFlag ? <div id="numberContainer">这是一个函数组件</div> : <b>我把函数组件隐藏了</b>} */}
+			<button onClick={toggleDom}>{toggleFlag ? '隐藏函数组件' : '打开函数组件'}</button>
 		</div>
 	);
 };
