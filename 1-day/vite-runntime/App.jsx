@@ -4,22 +4,74 @@ import React from "./core/React.js";
 // export default React.createElementVdom("div", { id: "app" }, "hi ", 'mini-react');
 
 let count = 10;
+let count2 = 10;
+let count3 = 10;
 let props = { id: "button" };
 let toggleFlag = true;
+
 function NumberComponent() {
-	return <div id="numberContainer">这是一个函数组件</div>;
+	console.log("NumberComponent 更新了");
+
+	const update = React.update();
+
+	return (
+		<div id="numberContainer">
+			conut: {count}
+			<button
+				onClick={() => {
+					count++;
+					update();
+				}}
+			>
+				更新试试看
+			</button>
+		</div>
+	);
+}
+
+function NumberComponent1() {
+	console.log("NumberComponent 更新了22");
+
+	const update = React.update();
+
+	return (
+		<div id="numberContainer">
+			count2: {count2}
+			<button
+				onClick={() => {
+					count2++;
+					update();
+				}}
+			>
+				更新试试看2
+			</button>
+		</div>
+	);
+}
+
+function ToggleDom() {
+	const update = React.update();
+	const toggleDom = () => {
+		toggleFlag = !toggleFlag;
+		update();
+	};
+	return (
+		<div className="toggleDom">
+			{toggleFlag ? <NumberComponent /> : <b>我把函数组件隐藏了</b>}
+			<button onClick={toggleDom}>
+				{toggleFlag ? "隐藏函数组件" : "打开函数组件"}
+			</button>
+		</div>
+	);
 }
 
 const App = () => {
+	const update = React.update();
+
 	const handlerClick = () => {
 		count++;
 		props = {};
-		React.update();
-	};
-
-	const toggleDom = () => {
-		toggleFlag = !toggleFlag;
-		React.update();
+		update();
 	};
 
 	return (
@@ -27,17 +79,9 @@ const App = () => {
 			id="container"
 			style={{ color: "red" }}
 		>
-			{/* <NumberComponent />
-			<div {...props}>
-				count: {count}
-				<button onClick={handlerClick}>点击</button>
-			</div>
-			hi - mini-react */}
-			{toggleFlag ? <NumberComponent /> : <b>我把函数组件隐藏了</b>}
-			{/* {toggleFlag ? <div id="numberContainer">这是一个函数组件</div> : <b>我把函数组件隐藏了</b>} */}
-			<button onClick={toggleDom}>
-				{toggleFlag ? "隐藏函数组件" : "打开函数组件"}
-			</button>
+            <ToggleDom />
+			{/* <NumberComponent /> */}
+			{/* <NumberComponent1 /> */}
 		</div>
 	);
 };

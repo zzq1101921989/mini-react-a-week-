@@ -20,7 +20,6 @@ function handlerElementStyle(el, styleMap) {
  * @param {*} newProps
  */
 export function updateDomElementProps(el, newProps, oldProps) {
-
 	// 1.如果旧Props上面没有数据，那么就要清空掉
 	Object.keys(oldProps).forEach((props) => {
 		if (props !== "children") {
@@ -79,17 +78,17 @@ export const toArray = (arg) => {
 	return Array.isArray(arg) ? arg : [arg];
 };
 
-export const createStateNode = (fiber) => {
-	switch (fiber.tag) {
-		/* 处理普通元素情况 */
-		case HOST_COMPONENT:
-			return createDomElement(fiber);
+/**
+ * 找寻非函数组件、类组件的fiber（dom属性为空）
+ * @param {*} fiber
+ */
+export const findParentContainer = (fiber) => {
 
-		/* 处理类组件的情况 */
-		case CLASS_COMPONENT:
+	let fiberParent = fiber.parent;
 
-		/* 处理函数组件的情况 */
-		case FUNCTION_COMPONENT:
-			return fiber.type;
+	while (!fiberParent.dom) {
+		fiberParent = fiberParent.parent;
 	}
+
+	return fiberParent;
 };

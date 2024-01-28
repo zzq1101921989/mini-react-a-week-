@@ -3,19 +3,27 @@ import {
 	HOST_COMPONENT,
 	getTag,
 	toArray,
-	createStateNode,
+	createDomElement,
 	isFunctionComponent,
 	updateDomElementProps,
+	FUNCTION_COMPONENT,
+	findParentContainer,
 } from "../util";
 
 // 当前任务
 let subTask = null;
 
-// 将要准备好的fiber，根据这个转换成真实的dom对象
-let paddingCommit = null;
+// 已经构建好的fiber树，并且已经挂载到视图上了
+let currentRoot = null;
 
 // 将要进行删除的fiber数组
 let deleteFiberList = [];
+
+// 当前构建的fiber
+let wipFiber = null;
+
+// 当前正在进行构建的fiber
+let wipRoot = null;
 
 /**
  * 创建文本虚拟dom对象
@@ -67,66 +75,79 @@ function updateProps(dom, props) {
 /**
  * 构建父与子fiber的关系
  */
-function reconciler(parentFiber, childFiber) {
-	// 获取旧fiber树上的旧节点
-	let oldFiber = parentFiber.alternate?.child;
+function reconcileChildren(fiber, children) {
+	let oldFiber = fiber.alternate?.child;
 
-	// 统一转换为数组，方便进行处理
-	const childFiberList = toArray(childFiber);
+	let prevChild = null;
 
-	/* 记得上一个生成的fiber节点，方便构建兄弟关系 */
-	let preChildFiber = null;
+	const childList = toArray(children);
 
-	childFiberList.forEach((child, index) => {
+	childList.forEach((child, index) => {
+		let newFiber;
+		const isSameType = oldFiber && oldFiber.type === child.type;
 
-		let newFiber = null;
-
-		const tag = getTag(child);
-
-		// 类型一样，应该就是更新节点了
-		if (oldFiber && oldFiber.type === child.type && parentFiber.effectTag !== 'replace') {
+		if (isSameType) {
 			newFiber = {
-				props: child.props,
 				type: child.type,
-				effects: [],
-				tag,
-				return: parentFiber,
-				stateNode: oldFiber.stateNode,
-				alternate: oldFiber,
-				effectTag: "update",
+				props: child.props,
+				dom: oldFiber.dom,
 				child: null,
+				parent: fiber,
 				sibling: null,
+				effectTag: "update",
+				alternate: oldFiber,
 			};
 		} else {
-			const isDeleteChild = oldFiber && oldFiber.type !== child.type;
-			if (isDeleteChild) deleteFiberList.push(oldFiber); 
 			newFiber = {
-				props: child.props,
 				type: child.type,
-				effects: [],
-				tag,
-				return: parentFiber,
-				alternate: isDeleteChild && parentFiber.effectTag !== 'replace' ? oldFiber : null,
-				effectTag: isDeleteChild && parentFiber.effectTag !== 'replace' ? 'replace' : "placement",
+				props: child.props,
+				dom: null,
 				child: null,
+				parent: fiber,
 				sibling: null,
+				effectTag: "placement",
 			};
 
-			newFiber.stateNode = createStateNode(newFiber);
+			// 如果新旧对比不对，那就证明需要删除了
+			if (oldFiber) {
+				deleteFiberList.push(oldFiber);
+			}
 		}
 
-		if (oldFiber) oldFiber = oldFiber.sibling;
-
-		if (index === 0 && !parentFiber.child) {
-			parentFiber.child = newFiber;
+		/**
+		 * 重点计算fiber节点的下一个节点
+		 */
+		if (oldFiber) {
+			oldFiber = oldFiber?.sibling;
 		}
 
-		// 上一个兄弟节点的 sibling 记录下一个兄弟节点
-		if (preChildFiber) {
-			preChildFiber.sibling = newFiber;
+		if (index === 0) {
+			fiber.child = newFiber;
+		} else {
+			prevChild.sibling = newFiber;
 		}
-		preChildFiber = newFiber;
+		prevChild = newFiber;
 	});
+}
+
+/**
+ * 处理函数fiber父与子节点的关系
+ * @param {} fiber
+ */
+function updateFunctionComponent(fiber) {
+	wipFiber = fiber;
+	reconcileChildren(fiber, fiber.type(fiber.props));
+}
+
+/**
+ * 构建普通fiber节点
+ * @param {*} fiber 
+ */
+function updateHostComponent(fiber) {
+	if (!fiber.dom) {
+		fiber.dom = createDomElement(fiber);
+	}
+	reconcileChildren(fiber, fiber.props.children);
 }
 
 /**
@@ -134,98 +155,80 @@ function reconciler(parentFiber, childFiber) {
  * @param {*} fiber
  */
 function performWorkOfUnit(fiber) {
-	if (fiber.props.children) {
-		if (isFunctionComponent(fiber.type)) {
-			reconciler(fiber, fiber.stateNode());
-		} else {
-			reconciler(fiber, fiber.props.children);
-		}
-	}
 
-	/* 如果有子fiber节点，那就继续向下构建咯（深度优先遍历 --- 递归） */
+	if (isFunctionComponent(fiber.type)) {
+        updateFunctionComponent(fiber);
+    } else {
+        updateHostComponent(fiber);
+    }
+
+	// 如果有子fiber节点，那就继续向下构建咯（深度优先遍历 --- 递归）
 	if (fiber.child) {
 		return fiber.child;
 	}
 
-	/* 定义变量接收一下当前正在处理的fiber对象 */
+	// 定义变量接收一下当前正在处理的fiber对象
 	let currentHanlderFiber = fiber;
 
-	// 如果有父级节点，证明就还没有完全构建完成
-	while (currentHanlderFiber.return) {
-		currentHanlderFiber.return.effects =
-			currentHanlderFiber.return.effects.concat(
-				currentHanlderFiber.effects.concat(currentHanlderFiber)
-			);
-
+	while (currentHanlderFiber.parent) {
 		if (currentHanlderFiber.sibling) {
 			return currentHanlderFiber.sibling;
 		}
-		currentHanlderFiber = currentHanlderFiber.return;
+		currentHanlderFiber = currentHanlderFiber.parent;
 	}
-
-	// 到了这一步，那就证明fiber全部构建完毕
-	paddingCommit = currentHanlderFiber;
 
 	return null;
 }
 
 /**
  * 从记录将要进行删除fiber的数组中，移除掉不需要的fiber
- * @param {*} fiber
+ * @param {*} fiber 
  */
 function commitDeleteFiber(fiber) {
+	let parentFiber = findParentContainer(fiber);
 
-    let parentFiber = fiber.return
+	let removerFiber = fiber;
 
-    while(isFunctionComponent(parentFiber.type)) {
-        parentFiber = parentFiber.return
-    }
+	while (isFunctionComponent(removerFiber.type)) {
+		removerFiber = removerFiber.child;
+	}
 
-    if (!isFunctionComponent(fiber.type)) {
-        parentFiber.stateNode.removeChild(fiber.stateNode);
-
-    }
+	parentFiber.dom.removeChild(removerFiber.dom);
 }
 
+/**
+ * 根据 fiber 节点，生成真正dom节点
+ */
+function commitWork(fiber) {
+	// 下一级，或者兄弟级有可能是没有的
+	if (!fiber) return;
+
+	// 找寻父级挂载点
+	const fiberParentContainer = findParentContainer(fiber);
+
+	if (fiber.effectTag === "placement") {
+		if (fiber.dom) {
+			fiberParentContainer.dom.append(fiber.dom);
+		}
+	} else if (fiber.effectTag === "update") {
+		updateDomElementProps(fiber.dom, fiber.props, fiber.alternate?.props);
+	}
+
+	commitWork(fiber.child);
+	commitWork(fiber.sibling);
+}
+
+/**
+ * 根据fiber树进行构建整颗dom节点
+ * @param {*} fiber
+ */
 function commitRoot(fiber) {
-
-	console.log(fiber.effects, "fiber.effects");
-
-	fiber.effects.forEach((child) => {
-		// 父级fiber
-		let parentFiber = child.return;
-
-		// 函数组件和类组件其实也会生成一个fiber对象，只不过是用来链接组件内部的子fiber用的
-		while (isFunctionComponent(parentFiber.type)) {
-			parentFiber = parentFiber.return;
-		}
-
-		if (child.effectTag === "placement") {
-			if (child.tag === HOST_COMPONENT) {
-				parentFiber.stateNode.append(child.stateNode);
-			}
-		} 
-        else if (child.effectTag === "update") {
-			updateDomElementProps(
-				child.stateNode,
-				child.props,
-				child.alternate.props
-			);
-		}
-		else if (child.effectTag === "replace") {
-
-            let insertBeforeChild = child
-
-            while (isFunctionComponent(insertBeforeChild.type)) {
-                insertBeforeChild = insertBeforeChild.child
-            }
-
-			parentFiber.stateNode.insertBefore(
-				insertBeforeChild.stateNode,
-				child.sibling.stateNode
-			);
-		}
-	});
+    console.log(fiber, 'fiber');
+	deleteFiberList.forEach(commitDeleteFiber);
+	commitWork(wipRoot.child);
+	currentRoot = wipRoot;
+	wipRoot = null;
+	deleteFiberList = [];
 }
 
 /**
@@ -237,16 +240,14 @@ function workLoop(deadlineTime) {
 	if (deadlineTime.timeRemaining() > 1) {
 		while (subTask) {
 			subTask = performWorkOfUnit(subTask);
+			if (wipRoot?.sibling?.type === subTask?.type) {
+				subTask = null;
+			}
 		}
 
 		// 准备开始构建真实dom节点了哦
-		if (paddingCommit) {
-			if (deleteFiberList.length)
-				deleteFiberList.forEach(commitDeleteFiber);
-
-			commitRoot(paddingCommit);
-
-			deleteFiberList = [];
+		if (!subTask && !!wipRoot) {
+			commitRoot(wipRoot);
 		}
 	}
 	// 递归的去执行构建任务 workLoop
@@ -254,20 +255,20 @@ function workLoop(deadlineTime) {
 }
 
 /**
- * 准备开始渲染方
+ * 准备开始渲染
  * @param {} fible
  * @param {*} container
  */
 function render(startFible, container) {
 	// 1、创建第一个task任务，默认一开始都是最顶层的root元素开始
-	subTask = {
+	wipRoot = {
 		props: { children: startFible },
-		stateNode: container,
+		dom: container,
 		tag: HOST_ROOT,
-		// 保存所有子孙的fiber对象
-		effects: [],
 		child: null,
 	};
+
+	subTask = wipRoot;
 
 	// 空余时间开始执行了！
 	requestIdleCallback(workLoop);
@@ -277,17 +278,20 @@ function render(startFible, container) {
  * 更新逻辑
  */
 function update() {
-	subTask = {
-		props: paddingCommit.props,
-		stateNode: paddingCommit.stateNode,
-		alternate: paddingCommit,
-		tag: HOST_ROOT,
-		effects: [],
-		child: null,
-	};
+	let currentFiber = wipFiber;
 
-	// 空余时间开始执行了！
-	requestIdleCallback(workLoop);
+	return () => {
+		wipRoot = {
+			...currentFiber,
+			alternate: currentFiber,
+			child: null,
+		};
+
+		subTask = wipRoot;
+
+		// 空余时间开始执行了！
+		requestIdleCallback(workLoop);
+	};
 }
 
 export default {
