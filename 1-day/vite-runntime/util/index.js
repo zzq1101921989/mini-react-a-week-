@@ -19,33 +19,27 @@ function handlerElementStyle(el, styleMap) {
  * @param {HTMLElement} el
  * @param {*} newProps
  */
-export function updateDomElementProps(el, newProps, oldProps) {
+export function updateDomElementProps(dom, nextProps, prevProps) {
+    
 	// 1.如果旧Props上面没有数据，那么就要清空掉
-	Object.keys(oldProps).forEach((props) => {
-		if (props !== "children") {
-			if (!newProps[props] && el.nodeName !== "#text") {
-				el.removeAttribute(props);
+	Object.keys(prevProps).forEach((key) => {
+		if (key !== "children") {
+			if (!(key in nextProps)) {
+				dom.removeAttribute(key);
 			}
 		}
 	});
 
-	Object.keys(newProps).forEach((p) => {
-		if (p !== "children") {
-			// 绑定事件
-			if (p.slice(0, 2) === "on") {
-				const eventType = p.slice(2).toLocaleLowerCase();
-
-				if (oldProps) el.removeEventListener(eventType, oldProps[p]);
-
-				el.addEventListener(eventType, newProps[p]);
-			}
-			// 绑定类型样式
-			else if (p === "style") {
-				handlerElementStyle(el, newProps[p]);
-			}
-			// 绑定基本属性
-			else {
-				el[p] = newProps[p];
+	Object.keys(nextProps).forEach((key) => {
+		if (key !== "children") {
+			if (nextProps[key] !== prevProps[key]) {
+				if (key.startsWith("on")) {
+					const eventType = key.slice(2).toLowerCase();
+					dom.removeEventListener(eventType, prevProps[key]);
+					dom.addEventListener(eventType, nextProps[key]);
+				} else {
+					dom[key] = nextProps[key];
+				}
 			}
 		}
 	});
@@ -83,7 +77,6 @@ export const toArray = (arg) => {
  * @param {*} fiber
  */
 export const findParentContainer = (fiber) => {
-
 	let fiberParent = fiber.parent;
 
 	while (!fiberParent.dom) {

@@ -82,8 +82,10 @@ function reconcileChildren(fiber, children) {
 
 	const childList = toArray(children);
 
-	childList.forEach((child, index) => {
+	childList.filter(Boolean).forEach((child, index) => {
+
 		let newFiber;
+
 		const isSameType = oldFiber && oldFiber.type === child.type;
 
 		if (isSameType) {
@@ -128,6 +130,11 @@ function reconcileChildren(fiber, children) {
 		}
 		prevChild = newFiber;
 	});
+
+	while (oldFiber) {
+		deleteFiberList.push(oldFiber);
+		oldFiber = oldFiber.sibling;
+	}
 }
 
 /**
@@ -141,7 +148,7 @@ function updateFunctionComponent(fiber) {
 
 /**
  * 构建普通fiber节点
- * @param {*} fiber 
+ * @param {*} fiber
  */
 function updateHostComponent(fiber) {
 	if (!fiber.dom) {
@@ -155,12 +162,11 @@ function updateHostComponent(fiber) {
  * @param {*} fiber
  */
 function performWorkOfUnit(fiber) {
-
 	if (isFunctionComponent(fiber.type)) {
-        updateFunctionComponent(fiber);
-    } else {
-        updateHostComponent(fiber);
-    }
+		updateFunctionComponent(fiber);
+	} else {
+		updateHostComponent(fiber);
+	}
 
 	// 如果有子fiber节点，那就继续向下构建咯（深度优先遍历 --- 递归）
 	if (fiber.child) {
@@ -182,7 +188,7 @@ function performWorkOfUnit(fiber) {
 
 /**
  * 从记录将要进行删除fiber的数组中，移除掉不需要的fiber
- * @param {*} fiber 
+ * @param {*} fiber
  */
 function commitDeleteFiber(fiber) {
 	let parentFiber = findParentContainer(fiber);
@@ -193,7 +199,10 @@ function commitDeleteFiber(fiber) {
 		removerFiber = removerFiber.child;
 	}
 
-	parentFiber.dom.removeChild(removerFiber.dom);
+    if (removerFiber.dom) {
+        parentFiber.dom.removeChild(removerFiber.dom);
+    }
+
 }
 
 /**
@@ -223,7 +232,7 @@ function commitWork(fiber) {
  * @param {*} fiber
  */
 function commitRoot(fiber) {
-    console.log(fiber, 'fiber');
+	console.log(fiber, "fiber");
 	deleteFiberList.forEach(commitDeleteFiber);
 	commitWork(wipRoot.child);
 	currentRoot = wipRoot;

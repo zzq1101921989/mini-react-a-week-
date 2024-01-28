@@ -65,6 +65,22 @@ function ToggleDom() {
 	);
 }
 
+let open = true;
+function ToggleDom2() {
+	const update = React.update();
+	const toggleDom = () => {
+		open = !open;
+		update();
+	};
+
+	return (
+		<div className="toggleDom">
+			{open && <div>显示</div>}
+			<button onClick={toggleDom}>{open ? "隐藏" : "打开"}</button>
+		</div>
+	);
+}
+
 const App = () => {
 	const update = React.update();
 
@@ -79,6 +95,7 @@ const App = () => {
 			id="container"
 			style={{ color: "red" }}
 		>
+            <ToggleDom2 />
             <ToggleDom />
 			{/* <NumberComponent /> */}
 			{/* <NumberComponent1 /> */}
