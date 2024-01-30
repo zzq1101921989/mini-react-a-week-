@@ -20,7 +20,7 @@ function handlerElementStyle(el, styleMap) {
  * @param {*} newProps
  */
 export function updateDomElementProps(dom, nextProps, prevProps) {
-    
+
 	// 1.如果旧Props上面没有数据，那么就要清空掉
 	Object.keys(prevProps).forEach((key) => {
 		if (key !== "children") {
@@ -37,7 +37,11 @@ export function updateDomElementProps(dom, nextProps, prevProps) {
 					const eventType = key.slice(2).toLowerCase();
 					dom.removeEventListener(eventType, prevProps[key]);
 					dom.addEventListener(eventType, nextProps[key]);
-				} else {
+				}
+                else if (key === 'style') { 
+                    handlerElementStyle(dom, nextProps[key])
+                } 
+                else {
 					dom[key] = nextProps[key];
 				}
 			}

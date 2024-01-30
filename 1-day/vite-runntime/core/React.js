@@ -25,6 +25,10 @@ let wipFiber = null;
 // 当前正在进行构建的fiber
 let wipRoot = null;
 
+// statehook的索引和存放的数组
+let stateHooksIndex
+let stateHooksArray
+
 /**
  * 创建文本虚拟dom对象
  * @param { string } nodeValue
@@ -82,8 +86,8 @@ function reconcileChildren(fiber, children) {
 
 	const childList = toArray(children);
 
+	// 在条件渲染中，会存在child 等于 false 的情况，这个情况可以直接忽略，所以filter一下
 	childList.filter(Boolean).forEach((child, index) => {
-
 		let newFiber;
 
 		const isSameType = oldFiber && oldFiber.type === child.type;
@@ -131,6 +135,7 @@ function reconcileChildren(fiber, children) {
 		prevChild = newFiber;
 	});
 
+	// 删除多余的节点
 	while (oldFiber) {
 		deleteFiberList.push(oldFiber);
 		oldFiber = oldFiber.sibling;
@@ -142,6 +147,9 @@ function reconcileChildren(fiber, children) {
  * @param {} fiber
  */
 function updateFunctionComponent(fiber) {
+    // 解析到新的函数组件的时候，重置
+    stateHooksIndex = 0
+    stateHooksArray = []
 	wipFiber = fiber;
 	reconcileChildren(fiber, fiber.type(fiber.props));
 }
@@ -199,10 +207,9 @@ function commitDeleteFiber(fiber) {
 		removerFiber = removerFiber.child;
 	}
 
-    if (removerFiber.dom) {
-        parentFiber.dom.removeChild(removerFiber.dom);
-    }
-
+	if (removerFiber.dom) {
+		parentFiber.dom.removeChild(removerFiber.dom);
+	}
 }
 
 /**
@@ -232,7 +239,6 @@ function commitWork(fiber) {
  * @param {*} fiber
  */
 function commitRoot(fiber) {
-	console.log(fiber, "fiber");
 	deleteFiberList.forEach(commitDeleteFiber);
 	commitWork(wipRoot.child);
 	currentRoot = wipRoot;
@@ -260,7 +266,7 @@ function workLoop(deadlineTime) {
 		}
 	}
 	// 递归的去执行构建任务 workLoop
-	if (subTask) requestIdleCallback(workLoop);
+	requestIdleCallback(workLoop);
 }
 
 /**
@@ -278,9 +284,6 @@ function render(startFible, container) {
 	};
 
 	subTask = wipRoot;
-
-	// 空余时间开始执行了！
-	requestIdleCallback(workLoop);
 }
 
 /**
@@ -297,14 +300,47 @@ function update() {
 		};
 
 		subTask = wipRoot;
-
-		// 空余时间开始执行了！
-		requestIdleCallback(workLoop);
 	};
 }
+
+/**
+ * hook 函数 - 主要起到更新作用
+ * @param {*} initValue 初始值
+ */
+function useState(initValue) {
+
+    let currentFiber = wipFiber;
+
+    const stateHook = {
+        // 每次新的fiber产生，都会把旧的fiber关联到 alternate 上，自然而然上次保存的hook也会携带过来
+        initValue: currentFiber.alternate?.stateHooks[stateHooksIndex].initValue || initValue,
+    }
+
+    stateHooksArray.push(stateHook)
+    stateHooksIndex++
+
+    // 每个都赋值最新的 hook 链表
+    currentFiber.stateHooks = stateHooksArray
+
+    const setState = (action) => {
+        stateHook.initValue = action(stateHook.initValue);
+        wipRoot = {
+			...currentFiber,
+			alternate: currentFiber,
+			child: null,
+		};
+
+		subTask = wipRoot;
+    }
+
+    return [ stateHook.initValue, setState ]
+}
+
+requestIdleCallback(workLoop);
 
 export default {
 	render,
 	update,
+    useState,
 	createElement,
 };

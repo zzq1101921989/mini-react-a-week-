@@ -3,24 +3,26 @@ import React from "./core/React.js";
 // vite遇到jsx的文件，其实在内部是会转换成下面这种形式的，而且刚好我们在上面也引入了React，所以就是用我们自己写的了
 // export default React.createElementVdom("div", { id: "app" }, "hi ", 'mini-react');
 
-let count = 10;
 let count2 = 10;
 let count3 = 10;
 let props = { id: "button" };
 let toggleFlag = true;
 
 function NumberComponent() {
+
 	console.log("NumberComponent 更新了");
 
-	const update = React.update();
+	const [count, setCount] = React.useState(10);
+	const [bar, setBar] = React.useState('bar');
 
 	return (
 		<div id="numberContainer">
-			conut: {count}
+			<div>conut: {count}</div>
+			<div>bar: {bar}</div>
 			<button
 				onClick={() => {
-					count++;
-					update();
+					setCount((v) => ++v);
+					setBar((v) => v + 'bar');
 				}}
 			>
 				更新试试看
@@ -95,8 +97,8 @@ const App = () => {
 			id="container"
 			style={{ color: "red" }}
 		>
-            <ToggleDom2 />
-            <ToggleDom />
+			<ToggleDom2 />
+			<ToggleDom />
 			{/* <NumberComponent /> */}
 			{/* <NumberComponent1 /> */}
 		</div>
