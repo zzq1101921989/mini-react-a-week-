@@ -26,8 +26,9 @@ let wipFiber = null;
 let wipRoot = null;
 
 // statehook的索引和存放的数组
-let stateHooksIndex
-let stateHooksArray
+let stateHooksIndex;
+let stateHooksArray;
+let effectHooksArray;
 
 /**
  * 创建文本虚拟dom对象
@@ -147,9 +148,10 @@ function reconcileChildren(fiber, children) {
  * @param {} fiber
  */
 function updateFunctionComponent(fiber) {
-    // 解析到新的函数组件的时候，重置
-    stateHooksIndex = 0
-    stateHooksArray = []
+	// 解析到新的函数组件的时候，重置
+	stateHooksIndex = 0;
+	stateHooksArray = [];
+	effectHooksArray = [];
 	wipFiber = fiber;
 	reconcileChildren(fiber, fiber.type(fiber.props));
 }
@@ -220,7 +222,8 @@ function commitWork(fiber) {
 	if (!fiber) return;
 
 	// 找寻父级挂载点
-	const fiberParentContainer = findParentContainer(fiber);
+	const fiberParentContainer =
+		fiber.tag === HOST_ROOT ? fiber.dom : findParentContainer(fiber);
 
 	if (fiber.effectTag === "placement") {
 		if (fiber.dom) {
@@ -235,12 +238,54 @@ function commitWork(fiber) {
 }
 
 /**
+ * 当dom挂载完毕的时候，递归去执行函数组件fiber的 effect 钩子函数
+ * @param {*} fiber
+ */
+function commitEffectHooks(fiber) {
+	function run(currentFiber) {
+		// 没有fiber不需要执行了
+		if (!currentFiber) return;
+
+		if (currentFiber.effectHooks) {
+			// init
+			if (!currentFiber.alternate) {
+				currentFiber.effectHooks?.forEach((hook) => {
+					hook.callback();
+				});
+			}
+			// update
+			else {
+				currentFiber.effectHooks?.forEach((newHook, index) => {
+					if (newHook.deps.length > 0) {
+						// 取出旧的 effectHook
+						const oldHook =
+							currentFiber.alternate?.effectHooks[index];
+
+						const isSome = newHook.deps.some((newDep) =>
+							oldHook.deps.includes(newDep)
+						);
+
+						if (!isSome) newHook.callback();
+					}
+				});
+			}
+		}
+
+		run(currentFiber.child);
+		run(currentFiber.sibling);
+	}
+
+	run(fiber);
+}
+
+/**
  * 根据fiber树进行构建整颗dom节点
  * @param {*} fiber
  */
 function commitRoot(fiber) {
 	deleteFiberList.forEach(commitDeleteFiber);
-	commitWork(wipRoot.child);
+	commitWork(wipRoot);
+	commitEffectHooks(wipRoot);
 	currentRoot = wipRoot;
 	wipRoot = null;
 	deleteFiberList = [];
@@ -308,39 +353,53 @@ function update() {
  * @param {*} initValue 初始值
  */
 function useState(initValue) {
+	let currentFiber = wipFiber;
 
-    let currentFiber = wipFiber;
+	const stateHook = {
+		// 每次新的fiber产生，都会把旧的fiber关联到 alternate 上，自然而然上次保存的hook也会携带过来
+		initValue:
+			currentFiber.alternate?.stateHooks[stateHooksIndex].initValue ||
+			initValue,
+	};
 
-    const stateHook = {
-        // 每次新的fiber产生，都会把旧的fiber关联到 alternate 上，自然而然上次保存的hook也会携带过来
-        initValue: currentFiber.alternate?.stateHooks[stateHooksIndex].initValue || initValue,
-    }
+	stateHooksArray.push(stateHook);
+	stateHooksIndex++;
 
-    stateHooksArray.push(stateHook)
-    stateHooksIndex++
+	// 每个都赋值最新的 hook 链表
+	currentFiber.stateHooks = stateHooksArray;
 
-    // 每个都赋值最新的 hook 链表
-    currentFiber.stateHooks = stateHooksArray
+	const setState = (action) => {
+		const isActionFunction = typeof action === "function";
 
-    const setState = (action) => {
+		let willState = isActionFunction ? action(stateHook.initValue) : action;
 
-        const isActionFunction = typeof action === 'function'
+		if (willState === stateHook.initValue) return;
 
-        let willState = isActionFunction ? action(stateHook.initValue) : action
-
-        if (willState === stateHook.initValue) return
-
-        stateHook.initValue = willState;
-        wipRoot = {
+		stateHook.initValue = willState;
+		wipRoot = {
 			...currentFiber,
 			alternate: currentFiber,
 			child: null,
 		};
 
 		subTask = wipRoot;
-    }
+	};
 
-    return [ stateHook.initValue, setState ]
+	return [stateHook.initValue, setState];
+}
+
+/**
+ * 副作用，在函数组件dom渲染完成的时候执行第一个回调函数
+ * @param {*} callback 回调函数
+ * @param {*} deps 更新依赖项数组
+ */
+function useEffect(callback, deps) {
+	const effectHook = {
+		callback,
+		deps,
+	};
+	effectHooksArray.push(effectHook);
+	wipFiber.effectHooks = effectHooksArray;
 }
 
 requestIdleCallback(workLoop);
@@ -348,6 +407,7 @@ requestIdleCallback(workLoop);
 export default {
 	render,
 	update,
-    useState,
+	useState,
+	useEffect,
 	createElement,
 };

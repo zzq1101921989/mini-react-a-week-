@@ -81,6 +81,7 @@ export const toArray = (arg) => {
  * @param {*} fiber
  */
 export const findParentContainer = (fiber) => {
+
 	let fiberParent = fiber.parent;
 
 	while (!fiberParent.dom) {

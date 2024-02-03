@@ -16,6 +16,18 @@ function NumberComponent() {
 
 	const [bar, setBar] = React.useState("bar");
 
+    React.useEffect(() => {
+		console.log("初始化");
+	}, []);
+
+    React.useEffect(() => {
+		console.log("初始化count");
+	}, [ count ]);
+
+    React.useEffect(() => {
+		console.log("初始化bar");
+	}, [ bar ]);
+
 	return (
 		<div id="numberContainer">
 			<div>conut: {count}</div>
@@ -23,14 +35,13 @@ function NumberComponent() {
 			<button
 				onClick={() => {
 					setCount((v) => ++v);
-					setBar((v) => v + "bar");
 				}}
 			>
 				更新count
 			</button>
 			<button
 				onClick={() => {
-					setBar('bar');
+					setBar((v) => v + 'bar' );
 				}}
 			>
 				更新bar
@@ -40,11 +51,13 @@ function NumberComponent() {
 }
 
 function ToggleDom() {
+
 	const [toggleFlag, setToggleFlag] = React.useState(false);
 
 	const toggleDom = () => {
 		setToggleFlag(!toggleFlag);
 	};
+
 	return (
 		<div className="toggleDom">
 			{toggleFlag ? <NumberComponent /> : <b>我把函数组件隐藏了</b>}
@@ -56,21 +69,13 @@ function ToggleDom() {
 }
 
 const App = () => {
-	const update = React.update();
-
-	const handlerClick = () => {
-		count++;
-		props = {};
-		update();
-	};
-
 	return (
 		<div
 			id="container"
 			style={{ color: "red" }}
 		>
-			<ToggleDom />
-			{/* <NumberComponent /> */}
+			{/* <ToggleDom /> */}
+			<NumberComponent />
 			{/* <NumberComponent1 /> */}
 		</div>
 	);
