@@ -13,7 +13,8 @@ function NumberComponent() {
 	console.log("NumberComponent 更新了");
 
 	const [count, setCount] = React.useState(10);
-	const [bar, setBar] = React.useState('bar');
+
+	const [bar, setBar] = React.useState("bar");
 
 	return (
 		<div id="numberContainer">
@@ -22,40 +23,27 @@ function NumberComponent() {
 			<button
 				onClick={() => {
 					setCount((v) => ++v);
-					setBar((v) => v + 'bar');
+					setBar((v) => v + "bar");
 				}}
 			>
-				更新试试看
+				更新count
 			</button>
-		</div>
-	);
-}
-
-function NumberComponent1() {
-	console.log("NumberComponent 更新了22");
-
-	const update = React.update();
-
-	return (
-		<div id="numberContainer">
-			count2: {count2}
 			<button
 				onClick={() => {
-					count2++;
-					update();
+					setBar('bar');
 				}}
 			>
-				更新试试看2
+				更新bar
 			</button>
 		</div>
 	);
 }
 
 function ToggleDom() {
-	const update = React.update();
+	const [toggleFlag, setToggleFlag] = React.useState(false);
+
 	const toggleDom = () => {
-		toggleFlag = !toggleFlag;
-		update();
+		setToggleFlag(!toggleFlag);
 	};
 	return (
 		<div className="toggleDom">
@@ -63,22 +51,6 @@ function ToggleDom() {
 			<button onClick={toggleDom}>
 				{toggleFlag ? "隐藏函数组件" : "打开函数组件"}
 			</button>
-		</div>
-	);
-}
-
-let open = true;
-function ToggleDom2() {
-	const update = React.update();
-	const toggleDom = () => {
-		open = !open;
-		update();
-	};
-
-	return (
-		<div className="toggleDom">
-			{open && <div>显示</div>}
-			<button onClick={toggleDom}>{open ? "隐藏" : "打开"}</button>
 		</div>
 	);
 }
@@ -97,7 +69,6 @@ const App = () => {
 			id="container"
 			style={{ color: "red" }}
 		>
-			<ToggleDom2 />
 			<ToggleDom />
 			{/* <NumberComponent /> */}
 			{/* <NumberComponent1 /> */}

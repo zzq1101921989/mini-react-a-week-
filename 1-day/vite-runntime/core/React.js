@@ -323,7 +323,14 @@ function useState(initValue) {
     currentFiber.stateHooks = stateHooksArray
 
     const setState = (action) => {
-        stateHook.initValue = action(stateHook.initValue);
+
+        const isActionFunction = typeof action === 'function'
+
+        let willState = isActionFunction ? action(stateHook.initValue) : action
+
+        if (willState === stateHook.initValue) return
+
+        stateHook.initValue = willState;
         wipRoot = {
 			...currentFiber,
 			alternate: currentFiber,
